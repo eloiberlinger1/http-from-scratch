@@ -10,7 +10,9 @@ import (
 )
 
 func ListenAndServe(addr string, handler http.Handler) error {
+
 	ln, err := net.Listen("tcp", addr)
+
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
@@ -31,6 +33,8 @@ func ListenAndServe(addr string, handler http.Handler) error {
 
 func HandleConnection(c net.Conn, mux http.Handler) error {
 
+	defer c.Close()
+
 	reader := bufio.NewReader(c)
 	req, err := ParseRequest(reader)
 
@@ -39,13 +43,14 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 		log.Fatal(err)
 	}
 
+	// Print the request (just for debug)
 	dump, _ := httputil.DumpRequest(req, true)
 	fmt.Println(string(dump))
 
-	/*
-			Functions that might be useful:
-			* ParseRequest()
-		  * mux.ServeHTTP()
-	*/
+	// response
+	w := NewResponse(c)
+
+	mux.ServeHTTP(w, req)
+
 	return nil
 }
