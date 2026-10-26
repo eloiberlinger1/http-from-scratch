@@ -6,7 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
+	"time"
 )
 
 func ListenAndServe(addr string, handler http.Handler) error {
@@ -35,19 +35,23 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 
 	defer c.Close()
 
+	if err := c.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return err
+	}
+
 	reader := bufio.NewReader(c)
 	req, err := ParseRequest(reader)
-
 	if err != nil {
-		fmt.Printf("Failed to parse")
+		fmt.Printf("Failed to parse: %v", err)
 		log.Fatal(err)
 	}
 
 	// Print the request (just for debug)
-	dump, _ := httputil.DumpRequest(req, true)
-	fmt.Println(string(dump))
+	// dump, _ := httputil.DumpRequest(req, true)
+	// fmt.Println(string(dump))
+	fmt.Printf("1 Request received : %s\n", req.Method)
 
-	// response
+	// prepare response object
 	w := NewResponse(c)
 
 	mux.ServeHTTP(w, req)

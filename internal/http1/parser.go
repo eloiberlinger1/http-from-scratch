@@ -29,7 +29,7 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 
 	// Check Method
 	switch method {
-	case "GET", "POST", "PATCH", "PUT", "DELETE":
+	case "GET", "POST", "PATCH", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE":
 		// accepted
 	default:
 		return nil, fmt.Errorf("Unsuported method : %s", method)
