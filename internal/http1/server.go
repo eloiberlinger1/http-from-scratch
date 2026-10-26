@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 )
 
 func ListenAndServe(addr string, handler http.Handler) error {
@@ -30,7 +31,19 @@ func ListenAndServe(addr string, handler http.Handler) error {
 
 func HandleConnection(c net.Conn, mux http.Handler) error {
 	reader := bufio.NewReader(c)
-	ParseRequest(reader)
+	req, err := ParseRequest(reader)
+	if err != nil {
+		return err
+	}
+
+	dump, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		fmt.Printf("Erreur lors du dump : %v\n", err)
+		return err
+	}
+
+	fmt.Println("--- REQUÊTE RECONSTRUITE ---")
+	fmt.Println(string(dump))
 
 	//fmt.Printf("%s", content)
 
