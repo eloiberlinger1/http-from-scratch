@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -55,6 +56,9 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Header:     make(http.Header),
+		// ContentLenght
+		// Body
+		// Host
 	}
 
 	for {
@@ -82,6 +86,25 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 			break
 		}
 
+	}
+
+	// Handeling body
+	strContentLength := result.Header.Get("Content-Length")
+
+	if strContentLength != "" {
+		contentLength, err := strconv.ParseInt(strContentLength, 10, 64)
+		if err != nil || contentLength < 0 {
+			return nil, fmt.Errorf("Invalid contentLenght %s", strContentLength)
+		}
+
+		result.ContentLength = contentLength
+
+		limitReader := io.LimitReader(reader, contentLength)
+		result.Body = io.NopCloser(limitReader)
+
+	} else {
+		result.Body = http.NoBody
+		result.ContentLength = 0
 	}
 
 	return result, nil

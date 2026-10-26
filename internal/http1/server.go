@@ -30,27 +30,17 @@ func ListenAndServe(addr string, handler http.Handler) error {
 }
 
 func HandleConnection(c net.Conn, mux http.Handler) error {
+
 	reader := bufio.NewReader(c)
 	req, err := ParseRequest(reader)
+
 	if err != nil {
-		return err
+		fmt.Printf("Failed to parse")
+		log.Fatal(err)
 	}
 
-	dump, err := httputil.DumpRequest(req, true)
-	if err != nil {
-		fmt.Printf("Erreur lors du dump : %v\n", err)
-		return err
-	}
-
-	fmt.Println("--- REQUÊTE RECONSTRUITE ---")
+	dump, _ := httputil.DumpRequest(req, true)
 	fmt.Println(string(dump))
-
-	//fmt.Printf("%s", content)
-
-	// if err != nil {
-	// 	fmt.Printf("Failed to parse")
-	// 	log.Fatal(err)
-	// }
 
 	/*
 			Functions that might be useful:
