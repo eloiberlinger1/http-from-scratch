@@ -13,6 +13,9 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 
 	line, err := reader.ReadSlice('\n')
 	if err != nil {
+		if err == io.EOF && len(line) == 0 {
+			return nil, nil
+		}
 		return nil, &HTTPError{
 			StatusCode: 400,
 		}
@@ -51,12 +54,11 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 	// Protocol check
 	if proto != "HTTP/1.1" {
 		return nil, &HTTPError{
-			StatusCode: 400,
+			StatusCode: 505,
 		}
 	}
 
-	// Initiate the request
-
+	// Instanciate the request
 	result := &http.Request{
 		Method:     method,
 		RequestURI: rawURI,
@@ -70,28 +72,48 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 		// Host
 	}
 
+	headerCount := 0
 	for {
 		l, err := reader.ReadSlice('\n')
-
 		if err != nil && err != io.EOF {
-			return nil, &HTTPError{
-				StatusCode: 400,
-			}
+			return nil, &HTTPError{StatusCode: 400}
+		}
+
+		headerCount++
+		if headerCount > 1000 {
+			return nil, &HTTPError{StatusCode: 400}
 		}
 
 		trimmed := strings.TrimRight(string(l), "\r\n")
 		if len(trimmed) == 0 {
 			break
 		}
-		kv := strings.SplitN(trimmed, ":", 2)
-		if len(kv) != 2 {
-			continue
+
+		colonIdx := strings.IndexByte(trimmed, ':')
+		if colonIdx <= 0 {
+			return nil, &HTTPError{StatusCode: 400}
 		}
-		key := strings.TrimSpace(kv[0])
-		value := strings.TrimSpace(kv[1])
+
+		key := trimmed[:colonIdx]
+		if strings.ContainsAny(key, " \t") {
+			return nil, &HTTPError{StatusCode: 400}
+		}
+
+		for i := 0; i < len(key); i++ {
+			c := key[i]
+			if c <= 32 || c >= 127 || strings.ContainsRune("()<>@,;:\\\"/[]?={}", rune(c)) {
+				return nil, &HTTPError{StatusCode: 400}
+			}
+		}
+
+		val := strings.TrimSpace(trimmed[colonIdx+1:])
+		if strings.Contains(val, "\r") {
+			return nil, &HTTPError{StatusCode: 400}
+		}
+
 		key = strings.ToLower(key)
 
-		result.Header.Add(key, value)
+		result.Header.Add(key, val)
 
 		if err == io.EOF {
 			break
@@ -103,6 +125,11 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 	strContentLength := result.Header.Get("Content-Length")
 
 	if strContentLength != "" {
+		if result.Header.Get("Transfer-Encoding") != "" {
+			return nil, &HTTPError{
+				StatusCode: 400,
+			}
+		}
 		contentLength, err := strconv.ParseInt(strContentLength, 10, 64)
 		if err != nil || contentLength < 0 {
 			return nil, &HTTPError{

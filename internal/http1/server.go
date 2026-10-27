@@ -3,9 +3,11 @@ package http1
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -53,27 +55,51 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 
 	defer c.Close()
 
-	if err := c.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
-		return err
-	}
-
 	reader := bufio.NewReader(c)
-	req, err := ParseRequest(reader)
-	if err != nil {
-		// return the corresponding error
-		fmt.Printf("[+] Request received : %s\n", http.StatusText(err.StatusCode))
-		err.WriteError(c)
-		return nil
+
+	for {
+
+		if err := c.SetReadDeadline(time.Now().Add(50 * time.Second)); err != nil {
+			c.Write([]byte("Connection: close"))
+			return nil
+		}
+
+		req, err := ParseRequest(reader)
+		if err != nil {
+			// return the corresponding error
+			fmt.Printf("[+] Request received : %s\n", http.StatusText(err.StatusCode))
+			err.WriteError(c)
+			break
+		}
+		if req == nil {
+			break
+		}
+		fmt.Printf("[+] Request received : %s\n", req.Method)
+
+		if req.Header.Get("Transfer-Encoding") != "" &&
+			strings.ToLower(req.Header.Get("Transfer-Encoding")) != "chunked" {
+			err = &HTTPError{
+				StatusCode: 501,
+			}
+			err.WriteError(c)
+			return nil
+		}
+
+		// Print the request (just for debug)
+		// dump, _ := httputil.DumpRequest(req, true)
+		// fmt.Println(string(dump))
+
+		w := NewResponse(c)
+		mux.ServeHTTP(w, req)
+
+		io.Copy(io.Discard, req.Body)
+		req.Body.Close()
+
+		if strings.ToLower(req.Header.Get("Connection")) == "close" {
+			break
+		}
+
 	}
-	fmt.Printf("[+] Request received : %s\n", req.Method)
-
-	// Print the request (just for debug)
-	// dump, _ := httputil.DumpRequest(req, true)
-	// fmt.Println(string(dump))
-
-	// prepare response object
-	w := NewResponse(c)
-	mux.ServeHTTP(w, req)
 
 	return nil
 }
