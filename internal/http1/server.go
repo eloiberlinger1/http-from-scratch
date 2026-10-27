@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type HTTPError struct {
@@ -59,11 +58,6 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 
 	for {
 
-		if err := c.SetReadDeadline(time.Now().Add(50 * time.Second)); err != nil {
-			c.Write([]byte("Connection: close"))
-			return nil
-		}
-
 		req, err := ParseRequest(reader)
 		if err != nil {
 			// return the corresponding error
@@ -75,15 +69,6 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 			break
 		}
 		fmt.Printf("[+] Request received : %s\n", req.Method)
-
-		if req.Header.Get("Transfer-Encoding") != "" &&
-			strings.ToLower(req.Header.Get("Transfer-Encoding")) != "chunked" {
-			err = &HTTPError{
-				StatusCode: 501,
-			}
-			err.WriteError(c)
-			return nil
-		}
 
 		// Print the request (just for debug)
 		// dump, _ := httputil.DumpRequest(req, true)
