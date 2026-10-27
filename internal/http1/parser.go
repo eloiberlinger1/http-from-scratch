@@ -2,7 +2,6 @@ package http1
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -10,17 +9,21 @@ import (
 	"strings"
 )
 
-func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
+func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 
 	line, err := reader.ReadSlice('\n')
 	if err != nil {
-		return nil, err
+		return nil, &HTTPError{
+			StatusCode: 400,
+		}
 	}
 
 	clean := strings.TrimRight(string(line), "\r\n")
 	elements := strings.Fields(clean)
 	if len(elements) != 3 {
-		return nil, fmt.Errorf("Unvalid request line : %q", clean)
+		return nil, &HTTPError{
+			StatusCode: 400,
+		}
 	}
 
 	method := elements[0]
@@ -28,22 +31,28 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 	proto := elements[2]
 
 	// Check Method
-	switch method {
-	case "GET", "POST", "PATCH", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE":
+	switch strings.ToUpper(method) {
+	case "GET", "POST", "PATCH", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "HEAD":
 		// accepted
 	default:
-		return nil, fmt.Errorf("Unsuported method : %s", method)
+		return nil, &HTTPError{
+			StatusCode: 400,
+		}
 	}
 
 	// Check the route
 	parsedURL, err := url.ParseRequestURI(rawURI)
 	if err != nil {
-		return nil, err
+		return nil, &HTTPError{
+			StatusCode: 400,
+		}
 	}
 
 	// Protocol check
 	if proto != "HTTP/1.1" {
-		return nil, err
+		return nil, &HTTPError{
+			StatusCode: 400,
+		}
 	}
 
 	// Initiate the request
@@ -65,7 +74,9 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 		l, err := reader.ReadSlice('\n')
 
 		if err != nil && err != io.EOF {
-			return nil, err
+			return nil, &HTTPError{
+				StatusCode: 400,
+			}
 		}
 
 		trimmed := strings.TrimRight(string(l), "\r\n")
@@ -94,7 +105,9 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 	if strContentLength != "" {
 		contentLength, err := strconv.ParseInt(strContentLength, 10, 64)
 		if err != nil || contentLength < 0 {
-			return nil, fmt.Errorf("Invalid contentLenght %s", strContentLength)
+			return nil, &HTTPError{
+				StatusCode: 400,
+			}
 		}
 
 		result.ContentLength = contentLength

@@ -9,6 +9,24 @@ import (
 	"time"
 )
 
+type HTTPError struct {
+	StatusCode int
+}
+
+func (e HTTPError) WriteError(c net.Conn) {
+	statusText := http.StatusText(e.StatusCode)
+	body := fmt.Sprintf("%d %s\n", e.StatusCode, statusText)
+
+	resp := fmt.Sprintf(
+		"HTTP/1.1 %d %s\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
+		e.StatusCode,
+		statusText,
+		len(body),
+		body,
+	)
+	c.Write([]byte(resp))
+}
+
 func ListenAndServe(addr string, handler http.Handler) error {
 
 	ln, err := net.Listen("tcp", addr)
@@ -42,18 +60,19 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 	reader := bufio.NewReader(c)
 	req, err := ParseRequest(reader)
 	if err != nil {
-		fmt.Printf("Failed to parse: %v", err)
-		log.Fatal(err)
+		// return the corresponding error
+		fmt.Printf("[+] Request received : %s\n", http.StatusText(err.StatusCode))
+		err.WriteError(c)
+		return nil
 	}
+	fmt.Printf("[+] Request received : %s\n", req.Method)
 
 	// Print the request (just for debug)
 	// dump, _ := httputil.DumpRequest(req, true)
 	// fmt.Println(string(dump))
-	fmt.Printf("1 Request received : %s\n", req.Method)
 
 	// prepare response object
 	w := NewResponse(c)
-
 	mux.ServeHTTP(w, req)
 
 	return nil
