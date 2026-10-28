@@ -61,14 +61,14 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 		req, err := ParseRequest(reader)
 		if err != nil {
 			// return the corresponding error
-			fmt.Printf("[+] Request received : %s\n", http.StatusText(err.StatusCode))
+			//fmt.Printf("[+] Request received : %s\n", http.StatusText(err.StatusCode))
 			err.WriteError(c)
 			break
 		}
 		if req == nil {
 			break
 		}
-		fmt.Printf("[+] Request received : %s\n", req.Method)
+		//fmt.Printf("[+] Request received : %s\n", req.Method)
 
 		// Print the request (just for debug)
 		// dump, _ := httputil.DumpRequest(req, true)
@@ -77,13 +77,25 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 		w := NewResponse(c)
 		mux.ServeHTTP(w, req)
 
-		io.Copy(io.Discard, req.Body)
-		req.Body.Close()
+		w.Finish()
 
-		if strings.ToLower(req.Header.Get("Connection")) == "close" {
-			break
+		if req.Body != nil {
+			io.Copy(io.Discard, req.Body)
+			req.Body.Close()
 		}
 
+		// TODO : parse properly the http version and compare here to set false by default for HTTP/1.0
+		keepAlive := true
+		connHeader := strings.ToLower(req.Header.Get("Connection"))
+		if connHeader == "close" {
+			keepAlive = false
+		} else if connHeader == "keep-alive" {
+			keepAlive = true
+		}
+
+		if !keepAlive {
+			break
+		}
 	}
 
 	return nil

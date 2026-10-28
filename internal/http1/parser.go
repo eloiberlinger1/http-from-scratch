@@ -32,6 +32,8 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 	method := elements[0]
 	rawURI := elements[1]
 	proto := elements[2]
+	var major int
+	var minor int
 
 	// Check Method
 	switch strings.ToUpper(method) {
@@ -52,10 +54,12 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 	}
 
 	// Protocol check
-	if proto != "HTTP/1.1" {
-		return nil, &HTTPError{
-			StatusCode: 505,
-		}
+	if proto == "HTTP/1.1" {
+		major, minor = 1, 1
+	} else if proto == "HTTP/1.0" {
+		major, minor = 1, 0
+	} else {
+		return nil, &HTTPError{StatusCode: 505}
 	}
 
 	// Instanciate the request
@@ -64,12 +68,9 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 		RequestURI: rawURI,
 		URL:        parsedURL,
 		Proto:      proto,
-		ProtoMajor: 1,
-		ProtoMinor: 1,
+		ProtoMajor: major,
+		ProtoMinor: minor,
 		Header:     make(http.Header),
-		// ContentLenght
-		// Body
-		// Host
 	}
 
 	headerCount := 0

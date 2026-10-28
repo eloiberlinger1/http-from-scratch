@@ -13,6 +13,7 @@ type Response struct {
 	ProtoMajor int
 	ProtoMinor int
 	HeaderSent bool
+	chunked    bool
 }
 
 func NewResponse(conn net.Conn) *Response {
@@ -33,10 +34,27 @@ func (r *Response) Header() http.Header {
 func (r *Response) Write(data []byte) (n int, err error) {
 
 	if !r.HeaderSent {
+
+		if r.header.Get("Content-Length") == "" {
+			r.header.Set("Transfer-Encoding", "chunked")
+			r.chunked = true
+		}
+
 		r.WriteHeader(200)
+
 	}
 
-	return r.Connection.Write(data)
+	if r.chunked {
+		if len(data) > 0 {
+			fmt.Fprintf(r.Connection, "%x\r\n", len(data))
+			r.Connection.Write(data)
+			fmt.Fprintf(r.Connection, "\r\n")
+		}
+	} else {
+		r.Connection.Write(data)
+	}
+
+	return len(data), nil
 
 }
 
@@ -60,4 +78,15 @@ func (r *Response) WriteHeader(statusCode int) {
 	fmt.Fprintf(r.Connection, "\r\n")
 	r.HeaderSent = true
 
+}
+
+func (r *Response) Finish() {
+	if !r.HeaderSent {
+		if r.header.Get("Content-Length") == "" {
+			r.header.Set("Content-Length", "0")
+		}
+		r.WriteHeader(r.StatusCode)
+	} else if r.chunked {
+		fmt.Fprintf(r.Connection, "0\r\n\r\n")
+	}
 }
