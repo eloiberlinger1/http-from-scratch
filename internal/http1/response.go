@@ -27,7 +27,6 @@ func NewResponse(conn net.Conn) *Response {
 }
 
 func (r *Response) Header() http.Header {
-
 	return r.header
 }
 
