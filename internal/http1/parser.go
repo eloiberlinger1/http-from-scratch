@@ -2,6 +2,8 @@ package http1
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -9,24 +11,28 @@ import (
 	"strings"
 )
 
-func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
+type HTTPError struct {
+	StatusCode int
+}
+
+func (e HTTPError) Error() string {
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, http.StatusText(e.StatusCode))
+}
+
+func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 
 	line, err := reader.ReadSlice('\n')
 	if err != nil {
-		if err == io.EOF && len(line) == 0 {
-			return nil, nil
+		if errors.Is(err, io.EOF) && len(line) == 0 {
+			return nil, io.EOF
 		}
-		return nil, &HTTPError{
-			StatusCode: 400,
-		}
+		return nil, &HTTPError{StatusCode: 400}
 	}
 
 	clean := strings.TrimRight(string(line), "\r\n")
 	elements := strings.Fields(clean)
 	if len(elements) != 3 {
-		return nil, &HTTPError{
-			StatusCode: 400,
-		}
+		return nil, &HTTPError{StatusCode: 400}
 	}
 
 	method := elements[0]
@@ -40,17 +46,13 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, *HTTPError) {
 	case "GET", "POST", "PATCH", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "HEAD":
 		// accepted
 	default:
-		return nil, &HTTPError{
-			StatusCode: 400,
-		}
+		return nil, &HTTPError{StatusCode: 400}
 	}
 
 	// Check the route
 	parsedURL, err := url.ParseRequestURI(rawURI)
 	if err != nil {
-		return nil, &HTTPError{
-			StatusCode: 400,
-		}
+		return nil, &HTTPError{StatusCode: 400}
 	}
 
 	// Protocol check

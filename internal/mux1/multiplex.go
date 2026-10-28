@@ -36,5 +36,6 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.WriteHeader(http.StatusNotFound)
+	http.NotFound(w, r)
+
 }

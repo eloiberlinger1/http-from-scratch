@@ -2,31 +2,13 @@ package http1
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strings"
 )
-
-type HTTPError struct {
-	StatusCode int
-}
-
-func (e HTTPError) WriteError(c net.Conn) {
-	statusText := http.StatusText(e.StatusCode)
-	body := fmt.Sprintf("%d %s\n", e.StatusCode, statusText)
-
-	resp := fmt.Sprintf(
-		"HTTP/1.1 %d %s\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
-		e.StatusCode,
-		statusText,
-		len(body),
-		body,
-	)
-	c.Write([]byte(resp))
-}
 
 func ListenAndServe(addr string, handler http.Handler) error {
 
@@ -44,7 +26,7 @@ func ListenAndServe(addr string, handler http.Handler) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Fatal(err)
+			continue
 		}
 		go HandleConnection(conn, handler)
 	}
@@ -57,12 +39,24 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 	reader := bufio.NewReader(c)
 
 	for {
-
 		req, err := ParseRequest(reader)
 		if err != nil {
-			// return the corresponding error
-			//fmt.Printf("[+] Request received : %s\n", http.StatusText(err.StatusCode))
-			err.WriteError(c)
+			// client closes connection
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			var httpErr HTTPError
+			code := http.StatusBadRequest
+			if errors.As(err, &httpErr) {
+				code = httpErr.StatusCode
+			}
+
+			w := NewResponse(c)
+			w.Header().Set("Connection", "close")
+			http.Error(w, http.StatusText(code), code)
+			w.Finish()
+
 			break
 		}
 		if req == nil {
