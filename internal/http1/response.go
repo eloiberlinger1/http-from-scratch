@@ -66,6 +66,11 @@ func (r *Response) WriteHeader(statusCode int) {
 	}
 	r.StatusCode = statusCode
 
+	if r.header.Get("Content-Length") == "" {
+		r.header.Set("Transfer-Encoding", "chunked")
+		r.chunked = true
+	}
+
 	statusText := http.StatusText(statusCode)
 	fmt.Fprintf(r.Connection, "HTTP/1.1 %d %s\r\n", statusCode, statusText)
 
