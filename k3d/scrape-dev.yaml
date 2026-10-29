@@ -1,0 +1,19 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMNodeScrape
+metadata:
+  name: dev-server-scrape
+  namespace: monitoring
+spec:
+  # On cible directement l'hôte via un VMStaticScrape ou une cible explicite
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: dev-local-app
+  namespace: monitoring
+spec:
+  targetEndpoints:
+    - targets: ["host.k3d.internal:8080"] # ou host.docker.internal:8080
+      interval: 5s
+      labels:
+        app: go-webserver-local

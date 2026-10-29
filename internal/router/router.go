@@ -10,6 +10,7 @@ func SetupRouter() *mux1.ServeMux {
 
 	handlers.RegisterRootHandler(mux)
 	handlers.RegisterHelloHandler(mux)
+	handlers.RegisterMetricsHandler(mux)
 
 	return mux
 }
