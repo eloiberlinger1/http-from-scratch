@@ -59,8 +59,6 @@ func (r *Response) Write(data []byte) (n int, err error) {
 }
 
 func (r *Response) WriteHeader(statusCode int) {
-	// TODO : implement statuscode
-
 	if r.HeaderSent {
 		return
 	}
@@ -82,7 +80,6 @@ func (r *Response) WriteHeader(statusCode int) {
 
 	fmt.Fprintf(r.Connection, "\r\n")
 	r.HeaderSent = true
-
 }
 
 func (r *Response) Finish() {

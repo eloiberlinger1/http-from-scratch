@@ -24,11 +24,6 @@ func NewServeMux() *ServeMux {
 	return &ServeMux{}
 }
 
-//
-// func ServeHttp(r http1.Response, req http.Request) {
-// 	fmt.Printf("%s", req.URL)
-// }
-
 func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, route := range m.Routes {
 		if route.Pattern == r.URL.Path {

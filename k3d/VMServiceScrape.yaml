@@ -1,0 +1,13 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: go-webserver-scrape
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: go-webserver
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

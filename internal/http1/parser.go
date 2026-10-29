@@ -9,6 +9,13 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/VictoriaMetrics/metrics"
+)
+
+var (
+	requestCounter = metrics.NewCounter(`http_requests_total{handler="root"}`)
+	requestLatency = metrics.NewHistogram(`http_request_duration_seconds{handler="root"}`)
 )
 
 type HTTPError struct {
