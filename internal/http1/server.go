@@ -81,7 +81,7 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 		// TODO : parse properly the http version and compare here to set false by default for HTTP/1.0
 		keepAlive := true
 		connHeader := strings.ToLower(req.Header.Get("Connection"))
-		if connHeader == "close" {
+		if connHeader == "close" || req.ProtoMinor == 0 {
 			keepAlive = false
 		} else if connHeader == "keep-alive" {
 			keepAlive = true
