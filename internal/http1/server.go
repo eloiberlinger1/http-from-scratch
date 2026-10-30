@@ -39,6 +39,7 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 	reader := bufio.NewReader(c)
 
 	for {
+		// TODO : What if we want to consume the client request body
 		req, err := ParseRequest(reader)
 		if err != nil {
 			// client closes connection
@@ -46,7 +47,7 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 				break
 			}
 
-			var httpErr HTTPError
+			var httpErr *HTTPError
 			code := http.StatusBadRequest
 			if errors.As(err, &httpErr) {
 				code = httpErr.StatusCode
@@ -62,7 +63,7 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 		if req == nil {
 			break
 		}
-		//fmt.Printf("[+] Request received : %s\n", req.Method)
+		fmt.Printf("[+] Request received : %s\n", req.Method)
 
 		// Print the request (just for debug)
 		// dump, _ := httputil.DumpRequest(req, true)
@@ -78,13 +79,12 @@ func HandleConnection(c net.Conn, mux http.Handler) error {
 			req.Body.Close()
 		}
 
-		// TODO : parse properly the http version and compare here to set false by default for HTTP/1.0
 		keepAlive := true
 		connHeader := strings.ToLower(req.Header.Get("Connection"))
-		if connHeader == "close" || req.ProtoMinor == 0 {
-			keepAlive = false
-		} else if connHeader == "keep-alive" {
+		if connHeader == "keep-alive" {
 			keepAlive = true
+		} else if connHeader == "close" || req.ProtoMinor == 0 {
+			keepAlive = false
 		}
 
 		if !keepAlive {

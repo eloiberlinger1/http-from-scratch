@@ -37,6 +37,10 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 	}
 
 	clean := strings.TrimRight(string(line), "\r\n")
+	if strings.Contains(string(line), "\n\n") || !strings.HasSuffix(string(line), "\r\n") {
+		return nil, &HTTPError{StatusCode: 400}
+	}
+
 	elements := strings.Fields(clean)
 	if len(elements) != 3 {
 		return nil, &HTTPError{StatusCode: 400}
@@ -63,9 +67,25 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 	}
 
 	// Protocol check
-	if proto == "HTTP/1.1" {
+	protoPrefix, version, ok := strings.Cut(proto, "/")
+	if !ok || protoPrefix != "HTTP" {
+		return nil, &HTTPError{StatusCode: 400}
+	}
+
+	majorStr, minorStr, ok := strings.Cut(version, ".")
+	if !ok {
+		return nil, &HTTPError{StatusCode: 400}
+	}
+
+	parsedMajor, err := strconv.Atoi(majorStr)
+	parsedMinor, err := strconv.Atoi(minorStr)
+	if err != nil {
+		return nil, &HTTPError{StatusCode: 400}
+	}
+
+	if parsedMajor == 1 && parsedMinor == 1 {
 		major, minor = 1, 1
-	} else if proto == "HTTP/1.0" {
+	} else if parsedMajor == 1 && parsedMinor == 0 {
 		major, minor = 1, 0
 	} else {
 		return nil, &HTTPError{StatusCode: 505}
@@ -85,7 +105,7 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 	headerCount := 0
 	for {
 		l, err := reader.ReadSlice('\n')
-		if err != nil && err != io.EOF {
+		if err != nil {
 			return nil, &HTTPError{StatusCode: 400}
 		}
 
@@ -111,13 +131,13 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 
 		for i := 0; i < len(key); i++ {
 			c := key[i]
-			if c <= 32 || c >= 127 || strings.ContainsRune("()<>@,;:\\\"/[]?={}", rune(c)) {
+			if c <= 32 || c >= 127 || strings.ContainsRune("()%<>@,;:\\\"/[]?={}", rune(c)) {
 				return nil, &HTTPError{StatusCode: 400}
 			}
 		}
 
 		val := strings.TrimSpace(trimmed[colonIdx+1:])
-		if strings.Contains(val, "\r") {
+		if strings.ContainsAny(val, "\r\t") {
 			return nil, &HTTPError{StatusCode: 400}
 		}
 
@@ -146,6 +166,17 @@ func ParseRequest(reader *bufio.Reader) (*http.Request, error) {
 				StatusCode: 400,
 			}
 		}
+
+		// 		if contentLength > 0 {
+		// 			// Vérifier en streamant vers io.Discard à travers un LimitReader
+		// 			limited := io.LimitReader(reader, contentLength)
+		//
+		// 			written, err := io.Copy(io.Discard, limited)
+		// 			if err != nil || written < contentLength {
+		// 				// Le flux s'est arrêté avant d'atteindre Content-Length
+		// 				return nil, &HTTPError{StatusCode: 400}
+		// 			}
+		// 		}
 
 		result.ContentLength = contentLength
 
